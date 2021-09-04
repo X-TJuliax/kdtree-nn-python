@@ -14,6 +14,9 @@ class KDTreeNN(NearestNeigh):
         self.neighbours = []
         self.is_point_found = False
         self.splitAxis = ""
+        self._point_comparate = None
+       
+  
 
 
         # Used for detailed debug print output
@@ -248,9 +251,38 @@ class KDTreeNN(NearestNeigh):
 
         return False
 
-    def add_point(self, point: Point) -> bool:
+    def add_point(self,  point: Point) -> bool:
+        if self._root is None:
+             self._dimension = len(point)
+             self._root = (point,  None, None, 0)
+             self._point_compare = self._create_point_compare(type(point))
+             self._length += 1
+             return self._root
+
+        cur_node = self._root     
+  
+        
+  
+        if cur_node[cur_node] <= point[cur_node]:
+                 if cur_node.right is None:
+                     cur_node.right = point(point,  None, None, cur_node)
+  
+                     self._length += 1
+                     return cur_node.right
+                 else: 
+                     cur_node = cur_node.right
+             
+                     
+                 if cur_node.left is None:
+                     cur_node.left = point(point,  None, None, cur_node)
+  
+                     self._length += 1
+                     return cur_node.left
+                 else:
+                     cur_node = cur_node.left
+
       
-        pass
+        
 
     def delete_point(self, point: Point) -> bool:
         result = False
