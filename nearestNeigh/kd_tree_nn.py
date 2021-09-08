@@ -55,11 +55,11 @@ class KDTreeNN(NearestNeigh):
         # >1 point in subset, sort according to alternating axis
         elif len(points) > 1:
 
-            # Even, x-axis (longitude). Odd, y-axis (latitude)
+            # Even, x-axis (lat). Odd, y-axis (long)
             if axis % 2 == 0:
-                points = sorted(points, key=lambda k: k.lon)
-            else:
                 points = sorted(points, key=lambda k: k.lat)
+            else:
+                points = sorted(points, key=lambda k: k.lon)
 
             # Get median point
             if len(points) % 2 == 0:
@@ -106,6 +106,23 @@ class KDTreeNN(NearestNeigh):
 
         return self.neighbours
 
+    def get_distance_to(self, axis: int, C: Point, P: Point) -> float:
+        """
+        Rreturns the distance depending on current axis using perpendicular
+        to target dummy point
+        """
+
+        # When splitting on x: D.x = C.x, D.y = P.y
+        if axis % 2 == 0:
+            D = Point(C.id, C.cat, C.lat, P.lon)
+
+        # When splitting on y: D.x = P.x, Dy = D.x
+        else:
+            D = Point(C.id, C.cat, C.lon, P.lat)
+
+        return D.dist_to(P)
+
+
     def forward_traverse(self, parent, cur_node, targ: Point, axis: int,
                          k: int, subtree=None):
         """
@@ -114,30 +131,33 @@ class KDTreeNN(NearestNeigh):
 
         input("----------forward_traverse()---------")
 
-        if cur_node.point.id == "id300" or cur_node.point.id == "id716" or cur_node.point.id == "id862":
-            print(cur_node.point.id, "ALERT")
+        # if cur_node.point.id == "id300" or cur_node.point.id == "id716" or cur_node.point.id == "id862":
+        #     print(cur_node.point.id, "ALERT")
 
         if cur_node is not None:
 
-            t_val = targ.lon if axis % 2 == 0 else targ.lat
-            split = "lon (x)" if axis % 2 == 0 else "lat (y). "
-            dist = cur_node.point.dist_to(targ)
+            c_val = cur_node.point.lat if axis % 2 == 0 else cur_node.point.lon
+            t_val = targ.lat if axis % 2 == 0 else targ.lon
+            split = "lat (x)" if axis % 2 == 0 else "lon (y)."
             values, status = "", ""
-            c_val = cur_node.point.lon if axis % 2 == 0 else cur_node.point.lat
+
+            # Use perpendicular to target dummy point for distance calcs
+            dist = self.get_distance_to(axis, cur_node.point, targ)
 
             if cur_node.left:
-                l_dist = cur_node.left.point.dist_to(targ)
-                l_val = cur_node.left.point.lon if axis % 2 == 0 else cur_node.left.point.lat
+                # l_dist = cur_node.left.point.dist_to(targ)
+                l_dist = self.get_distance_to(axis + 1, cur_node.left.point, targ)
+                l_val = cur_node.left.point.lat if axis % 2 == 0 else cur_node.left.point.lon
                 status += str("L " + cur_node.left.point.id + " " + str(round(l_val, 4)) + ", ")
                 values += str(str(round(l_val, 4)) + " < " + str(round(c_val, 4)) + ", ")
             if cur_node.right:
-                r_dist = cur_node.right.point.dist_to(targ)
-                r_val = cur_node.right.point.lon if axis % 2 == 0 else cur_node.right.point.lat
+                # r_dist = cur_node.right.point.dist_to(targ)
+                r_dist = self.get_distance_to(axis + 1, cur_node.right.point, targ)
+                r_val = cur_node.right.point.lat if axis % 2 == 0 else cur_node.right.point.lon
                 status += str("R " + cur_node.right.point.id + " " + str(round(r_val, 4)))
                 values += str(str(round(r_val, 4)) + " => " + str(round(c_val, 4)))
 
-            # Even, x-axis (longitude). Odd, y-axis (latitude)
-
+            # Even, x-axis (lat). Odd, y-axis (lon)
             print(cur_node.point.id, "split on", split, values)
             print("target point", split, "value:", t_val)
             print(cur_node.point.id, "is in a", subtree, "subtree with children:", status)
@@ -145,7 +165,7 @@ class KDTreeNN(NearestNeigh):
             # Traverse child nodes if they exist
             # X-dim split, compare lon
             if axis % 2 == 0:
-                if targ.lon >= cur_node.point.lon:
+                if targ.lat >= cur_node.point.lat:
                     if cur_node.right:
                         print(cur_node.point.id, "attempting to traverse right child", cur_node.right.point.id)
                         self.forward_traverse(cur_node, cur_node.right, targ,
@@ -174,7 +194,7 @@ class KDTreeNN(NearestNeigh):
 
             # Y-dim split, compare lat
             else:
-                if targ.lat >= cur_node.point.lat:
+                if targ.lon >= cur_node.point.lon:
                     if cur_node.right:
                         print(cur_node.point.id, "attempting to traverse right child", cur_node.right.point.id)
                         self.forward_traverse(cur_node, cur_node.right, targ,
@@ -281,7 +301,7 @@ class KDTreeNN(NearestNeigh):
         Check combined hash of parent + child against t_list
         so explored subtrees are not traversed twice.
 
-        Return true if hash exists in t_list
+        Return true if hash exists in t_list (i.e, dont traverse)
         """
 
         c_hash = self.hash_point(child.point) + self.hash_point(parent.point)
@@ -349,8 +369,6 @@ class KDTreeNN(NearestNeigh):
                                          key=lambda k: k['dist'], reverse=True)
                 if self.neighbours[0]['dist'] >= dist:
                     return True
-
-
 
     def add_point(self, point: Point) -> bool:
         """
