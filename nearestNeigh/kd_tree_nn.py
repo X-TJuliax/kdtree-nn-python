@@ -1,7 +1,7 @@
 from nearestNeigh.nearest_neigh import NearestNeigh
 from nearestNeigh.point import Point
 from nearestNeigh.node import Node
-
+import sys
 
 class KDTreeNN(NearestNeigh):
 
@@ -21,6 +21,8 @@ class KDTreeNN(NearestNeigh):
         # Combined Hashes of parent+child nodes.
         # Used to avoid double traversing already explored subtrees
         self.t_list = []
+
+        self.iteration = 0
 
     def build_index(self, points: [Point]):
         """
@@ -45,12 +47,14 @@ class KDTreeNN(NearestNeigh):
 
         # Subset size 1, root node with no children OR leaf node.
         elif len(points) == 1:
+            split = "lat" if axis % 2 == 0 else "lon"
             return Node(
                 Point(points[0].id, points[0].cat,
                       points[0].lat, points[0].lon),
                 left=None,
                 right=None,
-                parent=parent)
+                parent=parent,
+                split=split)
 
         # >1 point in subset, sort according to alternating axis
         elif len(points) > 1:
@@ -58,8 +62,10 @@ class KDTreeNN(NearestNeigh):
             # Even, x-axis (lat). Odd, y-axis (long)
             if axis % 2 == 0:
                 points = sorted(points, key=lambda k: k.lat)
+                split = "lat"
             else:
                 points = sorted(points, key=lambda k: k.lon)
+                split = "lon"
 
             # Get median point
             if len(points) % 2 == 0:
@@ -71,13 +77,11 @@ class KDTreeNN(NearestNeigh):
             # Give node a reference to parent node for ease of backtracking
             node = Node(
                 Point(median.id, median.cat, median.lat, median.lon),
-                left=None, right=None, parent=parent)
+                left=None, right=None, parent=parent, split=split)
 
             # Slice and partition subsets as child nodes/subtrees
-            left = self.partition(points[:m_index], axis + 1, node)
-            right = self.partition(points[m_index + 1:], axis + 1, node)
-            node.left = left
-            node.right = right
+            node.left = self.partition(points[:m_index], axis + 1, node)
+            node.right = self.partition(points[m_index + 1:], axis + 1, node)
 
             return node
 
@@ -96,7 +100,7 @@ class KDTreeNN(NearestNeigh):
         """
 
         # Find k nearest neighbours
-        self.neighbours, self.closed_list = [], []
+        self.neighbours, self.closed_list, self.b_list, self.t_list = [], [], [], []
         self.forward_traverse(None, self.root, search_term, 0, k)
 
         # Flatten neighbour list to points-only and sort by distance.
@@ -106,23 +110,6 @@ class KDTreeNN(NearestNeigh):
 
         return self.neighbours
 
-    def get_distance_to(self, axis: int, C: Point, P: Point) -> float:
-        """
-        Rreturns the distance depending on current axis using perpendicular
-        to target dummy point
-        """
-
-        # When splitting on x: D.x = C.x, D.y = P.y
-        if axis % 2 == 0:
-            D = Point(C.id, C.cat, C.lat, P.lon)
-
-        # When splitting on y: D.x = P.x, Dy = D.x
-        else:
-            D = Point(C.id, C.cat, C.lon, P.lat)
-
-        return D.dist_to(P)
-
-
     def forward_traverse(self, parent, cur_node, targ: Point, axis: int,
                          k: int, subtree=None):
         """
@@ -131,95 +118,99 @@ class KDTreeNN(NearestNeigh):
 
         input("----------forward_traverse()---------")
 
-        # if cur_node.point.id == "id300" or cur_node.point.id == "id716" or cur_node.point.id == "id862":
-        #     print(cur_node.point.id, "ALERT")
-
         if cur_node is not None:
+
+            if not self.axis_is_valid(axis, cur_node):
+                print("provided axis does not match current nodes splitting axis")
+                sys.exit(0)
 
             c_val = cur_node.point.lat if axis % 2 == 0 else cur_node.point.lon
             t_val = targ.lat if axis % 2 == 0 else targ.lon
-            split = "lat (x)" if axis % 2 == 0 else "lon (y)."
+            split = cur_node.was_split_on
             values, status = "", ""
 
-            # Use perpendicular to target dummy point for distance calcs
+            # Use perpendicular-to-target dummy point for distance calcs
             dist = self.get_distance_to(axis, cur_node.point, targ)
 
             if cur_node.left:
-                # l_dist = cur_node.left.point.dist_to(targ)
-                l_dist = self.get_distance_to(axis + 1, cur_node.left.point, targ)
                 l_val = cur_node.left.point.lat if axis % 2 == 0 else cur_node.left.point.lon
-                status += str("L " + cur_node.left.point.id + " " + str(round(l_val, 4)) + ", ")
-                values += str(str(round(l_val, 4)) + " < " + str(round(c_val, 4)) + ", ")
+                status += str("L " + cur_node.left.point.id + ", ")
+                values += str(str(round(l_val, 4)) + " < " + str(round(t_val, 4)) + ", ")
             if cur_node.right:
-                # r_dist = cur_node.right.point.dist_to(targ)
-                r_dist = self.get_distance_to(axis + 1, cur_node.right.point, targ)
                 r_val = cur_node.right.point.lat if axis % 2 == 0 else cur_node.right.point.lon
-                status += str("R " + cur_node.right.point.id + " " + str(round(r_val, 4)))
-                values += str(str(round(r_val, 4)) + " => " + str(round(c_val, 4)))
+                status += str("R " + cur_node.right.point.id)
+                values += str(str(round(r_val, 4)) + " => " + str(round(t_val, 4)))
 
             # Even, x-axis (lat). Odd, y-axis (lon)
-            print(cur_node.point.id, "split on", split, values)
-            print("target point", split, "value:", t_val)
-            print(cur_node.point.id, "is in a", subtree, "subtree with children:", status)
+            print("current point:", cur_node.point.id)
+            print("children:", status)
+            if subtree:
+                print(str("subtree: " + subtree + ", split: " + split))
+            else:
+                print("split: ", split)
+            print("target", split, "value:", t_val)
+            print(cur_node.point.id, split, "value:", c_val)
 
             # Traverse child nodes if they exist
             # X-dim split, compare lon
             if axis % 2 == 0:
                 if targ.lat >= cur_node.point.lat:
                     if cur_node.right:
-                        print(cur_node.point.id, "attempting to traverse right child", cur_node.right.point.id)
+                        print(cur_node.point.id, "attempting to traverse right child", cur_node.right.point.id, "beacause", targ.lat, ">=", cur_node.point.lat)
+
                         self.forward_traverse(cur_node, cur_node.right, targ,
                                               axis + 1, k, subtree="right")
                     else:
                         print(cur_node.point.id, "tried traversing right but no subtree exists")
-                        if self.save_neighbour(dist, cur_node.point, k, targ, False):
-                            if cur_node.left:
-                                print(cur_node.point.id, "other (left) subtree", cur_node.left.point.id, "should be traversed")
-                                self.forward_traverse(
-                                    cur_node, cur_node.left, targ,
-                                    axis + 1, k, subtree="left")
+                        # if self.save_neighbour(dist, cur_node.point, k, targ, False):
+                        if cur_node.left:
+                            print(cur_node.point.id, "other (left) subtree", cur_node.left.point.id, "should be traversed")
+                            self.forward_traverse(
+                                cur_node, cur_node.left, targ,
+                                axis + 1, k, subtree="left")
                 else:
                     if cur_node.left:
-                        print(cur_node.point.id, "attempting to traverse left child", cur_node.left.point.id)
+                        print(cur_node.point.id, "attempting to traverse left child", cur_node.left.point.id, "beacause", targ.lat, "<", cur_node.point.lat)
+
                         self.forward_traverse(cur_node, cur_node.left, targ,
                                               axis + 1, k, subtree="left")
                     else:
                         print(cur_node.point.id, "tried traversing left but no subtree exists.")
-                        if self.save_neighbour(dist, cur_node.point, k, targ, False):
-                            if cur_node.right:
-                                print(cur_node.point.id, "other (right) subtree", cur_node.right.point.id, "should be traversed")
-                                self.forward_traverse(
-                                    cur_node, cur_node.right, targ,
-                                    axis + 1, k, subtree="right")
+                        # if self.save_neighbour(dist, cur_node.point, k, targ, False):
+                        if cur_node.right:
+                            print(cur_node.point.id, "other (right) subtree", cur_node.right.point.id, "should be traversed")
+                            self.forward_traverse(
+                                cur_node, cur_node.right, targ,
+                                axis + 1, k, subtree="right")
 
             # Y-dim split, compare lat
             else:
                 if targ.lon >= cur_node.point.lon:
                     if cur_node.right:
-                        print(cur_node.point.id, "attempting to traverse right child", cur_node.right.point.id)
+                        print(cur_node.point.id, "attempting to traverse right child", cur_node.right.point.id, "beacause", targ.lon, ">=", cur_node.point.lon)
                         self.forward_traverse(cur_node, cur_node.right, targ,
                                               axis + 1, k, subtree="right")
                     else:
                         print(cur_node.point.id, "tried traversing right but no subtree exists")
-                        if self.save_neighbour(dist, cur_node.point, k, targ, False):
-                            if cur_node.left:
-                                print(cur_node.point.id, "other (left) subtree", cur_node.left.point.id, "should be traversed")
-                                self.forward_traverse(
-                                    cur_node, cur_node.left, targ,
-                                    axis + 1, k, subtree="left")
+                        # if self.save_neighbour(dist, cur_node.point, k, targ, False):
+                        if cur_node.left:
+                            print(cur_node.point.id, "other (left) subtree", cur_node.left.point.id, "should be traversed")
+                            self.forward_traverse(
+                                cur_node, cur_node.left, targ,
+                                axis + 1, k, subtree="left")
                 else:
                     if cur_node.left:
-                        print(cur_node.point.id, "attempting to traverse left child", cur_node.left.point.id)
+                        print(cur_node.point.id, "attempting to traverse left child", cur_node.left.point.id, "beacause", targ.lon, "<", cur_node.point.lon)
                         self.forward_traverse(cur_node, cur_node.left, targ,
                                               axis + 1, k, subtree="left")
                     else:
                         print(cur_node.point.id, "tried traversing left but no subtree exists")
-                        if self.save_neighbour(dist, cur_node.point, k, targ, False):
-                            if cur_node.right:
-                                print(cur_node.point.id, "other (right) subtree", cur_node.right.point.id, "should be traversed")
-                                self.forward_traverse(
-                                    cur_node, cur_node.right, targ,
-                                    axis + 1, k, subtree="right")
+                        # if self.save_neighbour(dist, cur_node.point, k, targ, False):
+                        if cur_node.right:
+                            print(cur_node.point.id, "other (right) subtree", cur_node.right.point.id, "should be traversed")
+                            self.forward_traverse(
+                                cur_node, cur_node.right, targ,
+                                axis + 1, k, subtree="right")
 
             # Save neighbour and backtrack when leaf node reached
             if cur_node.left is None and cur_node.right is None:
@@ -227,10 +218,43 @@ class KDTreeNN(NearestNeigh):
                 self.save_neighbour(dist, cur_node.point, k, targ)
 
                 # Safeguard multiple backtrack
-                # (shouldnt happen, just in case to prevent unnecessary recursion)
                 if self.hash_point(cur_node.point) not in self.b_list:
                     self.b_list.append(self.hash_point(cur_node.point))
                     self.backtrack(cur_node, targ, axis, k, subtree)
+
+    def get_distance_to(self, axis: int, parent: Point, target: Point) -> float:
+        """
+        Rreturns the distance depending on current axis using perpendicular
+        to target dummy point
+        """
+
+        # Original method
+        # return parent.dist_to(target)
+
+        # Hoang method
+        # When splitting on x: D.x = parent.y, D.y = parent.y
+        if axis % 2 == 0:
+            D = Point(parent.id, parent.cat, target.lat, parent.lon)
+
+        # When splitting on y: D.x = parent.x, D.y = target.y
+        else:
+            D = Point(parent.id, parent.cat, parent.lat, target.lon)
+
+        return D.dist_to(target)
+
+    def axis_is_valid(self, axis: int, node: Node) -> bool:
+        """
+        Checks axis matches the given node
+        """
+
+        if axis % 2 == 0 and node.was_split_on == "lat":
+            axis_is_valid = True
+        elif axis % 2 != 0 and node.was_split_on == "lon":
+            axis_is_valid = True
+        else:
+            axis_is_valid = False
+
+        return axis_is_valid
 
     def backtrack(self, cur_node, targ: Point, axis: int, k: int,
                   tree=None):
@@ -246,11 +270,18 @@ class KDTreeNN(NearestNeigh):
             if cur_node.parent:
 
                 input("-------------backtrack()-------------")
-                print("backtracking from", cur_node.point.id, "to", cur_node.parent.point.id,)
+                print("backtracked from", cur_node.point.id, "to", cur_node.parent.point.id,)
+
+                if not self.axis_is_valid(axis, cur_node):
+                    print("provided axis does not match current nodes splitting axis")
+                    sys.exit(0)
 
                 # Check if other subtree should be explored
-                dist = cur_node.parent.point.dist_to(targ)
+                # dist = cur_node.parent.point.dist_to(targ)
+                dist = self.get_distance_to(axis - 1, cur_node.parent.point, targ)
+
                 if self.save_neighbour(dist, cur_node.parent.point, k, targ):
+                    print(cur_node.parent.point.id, "splitting line dist < smallest neighbours dist, other subtree should be explored")
 
                     if tree == "left":
                         if cur_node.parent.right:
@@ -288,13 +319,15 @@ class KDTreeNN(NearestNeigh):
                                             cur_node.parent, cur_node.parent.right, targ,
                                             axis, k, subtree="right")
 
+                else:
+                    print("Dont explore other subtree")
+
                 # Keep backtracking until branches no longer valid
                 st = "right" if tree == "left" else "left"
-                self.backtrack(cur_node.parent, targ, axis, k, st)
+                self.backtrack(cur_node.parent, targ, axis - 1, k, st)
 
             else:
                 print("backtracked to root", cur_node.point.id)
-
 
     def already_travelled(self, parent: Node, child: Node) -> bool:
         """
@@ -304,12 +337,13 @@ class KDTreeNN(NearestNeigh):
         Return true if hash exists in t_list (i.e, dont traverse)
         """
 
+        # return False
+
         c_hash = self.hash_point(child.point) + self.hash_point(parent.point)
 
         if c_hash not in self.t_list:
             self.t_list.append(c_hash)
             return False
-
         else:
             return True
 
@@ -335,7 +369,11 @@ class KDTreeNN(NearestNeigh):
 
                 if self.neighbours[0]['dist'] > dist:
                     if p_hash not in [n['hash'] for n in self.neighbours]:
-                        print("Saving new nearest neighbour", point.id)
+                        print("Saving new nearest neighbour", point.id, "because", self.neighbours[0]['dist'], ">", dist)
+                        print("current node distance to target:", dist)
+                        print("neighbours:")
+                        for n in [(n['point'].id, n['dist']) for n in self.neighbours]:
+                            print(n)
                         del self.neighbours[0]
                         self.neighbours.append({
                             'dist': dist,
@@ -349,7 +387,11 @@ class KDTreeNN(NearestNeigh):
             # Save immediately if < k neighbours in list
             elif len(self.neighbours) < k and point.cat == targ.cat:
                 if p_hash not in [n['hash'] for n in self.neighbours]:
-                    print("Saving new nearest neighbour", point.id)
+                    print("Saving new nearest neighbour", point.id, "because < k neighbours already saved")
+                    print("current node distance to target:", dist)
+                    print("neighbours:")
+                    for n in [(n['point'].id, n['dist']) for n in self.neighbours]:
+                        print(n)
                     self.neighbours.append({
                         'dist': dist,
                         'point': point,

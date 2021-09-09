@@ -38,6 +38,9 @@ class NaiveNN(NearestNeigh):
         # Slice for k neighbours
         k_neighbours = [i['point'] for i in sorted_distances[:k]]
 
+        for n in sorted_distances:
+            print(n['point'].id, "dist:", n['dist'])
+
         return k_neighbours
 
     def add_point(self, point: Point) -> bool:
