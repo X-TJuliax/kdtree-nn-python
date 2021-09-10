@@ -149,6 +149,7 @@ class KDTreeNN(NearestNeigh):
             else:
                 print("split: ", split)
             print("target", split, "value:", t_val)
+            print("distance to target:", dist)
             print(cur_node.point.id, split, "value:", c_val)
 
             # Traverse child nodes if they exist
@@ -222,7 +223,7 @@ class KDTreeNN(NearestNeigh):
                     self.b_list.append(self.hash_point(cur_node.point))
                     self.backtrack(cur_node, targ, axis, k, subtree)
 
-    def get_distance_to(self, axis: int, parent: Point, target: Point) -> float:
+    def get_distance_to(self, axis: int, C: Point, P: Point) -> float:
         """
         Rreturns the distance depending on current axis using perpendicular
         to target dummy point
@@ -232,15 +233,17 @@ class KDTreeNN(NearestNeigh):
         # return parent.dist_to(target)
 
         # Hoang method
-        # When splitting on x: D.x = parent.y, D.y = parent.y
+        # P = target
+        # D = dummy node perpendicular to target
+        # C = splitting line / current node
+
         if axis % 2 == 0:
-            D = Point(parent.id, parent.cat, target.lat, parent.lon)
+            D = Point("", C.cat, C.lat, P.lon)
 
-        # When splitting on y: D.x = parent.x, D.y = target.y
         else:
-            D = Point(parent.id, parent.cat, parent.lat, target.lon)
+            D = Point("", C.cat, P.lat, C.lon)
 
-        return D.dist_to(target)
+        return P.dist_to(D)
 
     def axis_is_valid(self, axis: int, node: Node) -> bool:
         """
@@ -360,6 +363,7 @@ class KDTreeNN(NearestNeigh):
         """
 
         if save:
+
             p_hash = self.hash_point(point)
 
             # If k neighbours and cur_node dist > max(saved), replace max.
@@ -371,9 +375,12 @@ class KDTreeNN(NearestNeigh):
                     if p_hash not in [n['hash'] for n in self.neighbours]:
                         print("Saving new nearest neighbour", point.id, "because", self.neighbours[0]['dist'], ">", dist)
                         print("current node distance to target:", dist)
+
                         print("neighbours:")
+
                         for n in [(n['point'].id, n['dist']) for n in self.neighbours]:
                             print(n)
+
                         del self.neighbours[0]
                         self.neighbours.append({
                             'dist': dist,
@@ -389,9 +396,11 @@ class KDTreeNN(NearestNeigh):
                 if p_hash not in [n['hash'] for n in self.neighbours]:
                     print("Saving new nearest neighbour", point.id, "because < k neighbours already saved")
                     print("current node distance to target:", dist)
+
                     print("neighbours:")
                     for n in [(n['point'].id, n['dist']) for n in self.neighbours]:
                         print(n)
+
                     self.neighbours.append({
                         'dist': dist,
                         'point': point,
