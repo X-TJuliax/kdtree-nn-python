@@ -136,8 +136,8 @@ class KDTreeNN(NearestNeigh):
                         check_other_subtree = True
 
                 # Fwd-traverse unexplored subtree if required
-                # if self.nns[0]['dist'] > p_dist or len(self.nns) < k:
-                if self.nns[0]['dist'] >= p_dist or check_other_subtree:
+                if self.nns[0]['dist'] > p_dist or len(self.nns) < k or check_other_subtree:
+                # if self.nns[0]['dist'] >= p_dist or check_other_subtree:
                     print("checking", C.point.id, "other subtree")
                     if C.left is not None:
                         new_mh = self.hash_move(C.point, C.left.point, "fwd")
