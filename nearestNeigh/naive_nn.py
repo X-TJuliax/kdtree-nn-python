@@ -27,6 +27,13 @@ class NaiveNN(NearestNeigh):
 
             # Only consider distance if category matches
             if point.cat == search_term.cat:
+
+                # # debug only
+                # if point.id == "id657":
+                #     print("lat", point.lat)
+                #     print("lon", point.lon)
+                #     print("dist", point.dist_to(search_term))
+
                 distances.append({
                     'dist': point.dist_to(search_term),
                     'point': point
