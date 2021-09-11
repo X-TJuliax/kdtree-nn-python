@@ -64,9 +64,9 @@ class KDTreeNN(NearestNeigh):
 
         self.nns = sorted(self.nns, key=lambda k: k['dist'])
 
-        print("neighbours:")
-        for n in [(n['point'].id, n['dist']) for n in self.nns]:
-            print(n)
+        # print("neighbours:")
+        # for n in [(n['point'].id, n['dist']) for n in self.nns]:
+        #     print(n)
 
         self.nns = [n['point'] for n in self.nns]
 
@@ -86,24 +86,24 @@ class KDTreeNN(NearestNeigh):
 
         if C is not None:
 
-            input("----------search_knn()---------")
+            # input("----------search_knn()---------")
 
-            prev_print_val = prev.point.id if prev else None
-            dtn = "Traversed to" if not backtracking else "Backtracked to"
-            children = ""
-            if C.left:
-                children += str("L: " + C.left.point.id)
-            if C.right:
-                children += str(", R: " + C.right.point.id)
+            # prev_print_val = prev.point.id if prev else None
+            # dtn = "Traversed to" if not backtracking else "Backtracked to"
+            # children = ""
+            # if C.left:
+            #     children += str("L: " + C.left.point.id)
+            # if C.right:
+            #     children += str(", R: " + C.right.point.id)
 
-            print(dtn, C.point.id, "from", prev_print_val)
-            print(C.point.id, "split on", C.was_split_on)
-            print(C.point.id, "has children:", children)
+            # print(dtn, C.point.id, "from", prev_print_val)
+            # print(C.point.id, "split on", C.was_split_on)
+            # print(C.point.id, "has children:", children)
 
             # Prevent uneccesary evaluations/multiple traversals
             c_hash = self.hash_point(C.point)
             if c_hash in self.closed_list:
-                print(prev.point.id, "to", C.point.id, "already traversed")
+                # print(prev.point.id, "to", C.point.id, "already traversed")
                 return
 
             # Get relevant per-axis node and distance values
@@ -115,20 +115,20 @@ class KDTreeNN(NearestNeigh):
             if not backtracking:
                 if T_dim_val >= C_dim_val:
                     if C.right is not None:
-                        print("Going to", C.point.id, "right child:", C.right.point.id, T_dim_val, ">=", C_dim_val)
+                        # print("Going to", C.point.id, "right child:", C.right.point.id, T_dim_val, ">=", C_dim_val)
                         self.search_knn(C, C.right, T, k, axis + 1)
                     else:
                         backtracking = True
                 else:
                     if C.left is not None:
-                        print("Going to", C.point.id, "left child:", C.left.point.id, T_dim_val, "<", C_dim_val)
+                        # print("Going to", C.point.id, "left child:", C.left.point.id, T_dim_val, "<", C_dim_val)
                         self.search_knn(C, C.left, T, k, axis + 1)
                     else:
                         backtracking = True
 
                 if not C.left and not C.right:
                     backtracking = True
-                    print(C.point.id, "leaf node reached")
+                    # print(C.point.id, "leaf node reached")
 
             # Reverse - evaluate C
             if backtracking:
@@ -136,17 +136,16 @@ class KDTreeNN(NearestNeigh):
                 p_dist = self.p_distance(axis, C.point, T)
                 if C.point.cat == T.cat:
                     if len(self.nns) < k:
-                        print("saving as less than k nns exist")
+                        # print("saving as less than k nns exist")
                         self.save_n(a_dist, C.point)
                     elif len(self.nns) == k and self.nns[0]['dist'] > a_dist:
-                        print("saving as less than k nns exist")
                         self.save_n(a_dist, C.point, replace=True)
 
                 # Fwd-traverse unexplored subtree if required
                 # if self.nns[0]['dist'] > p_dist or len(self.nns) < k or check_other_subtree:
                 if self.nns[0]['dist'] > p_dist:
                     self.closed_list.append(c_hash)
-                    print(C.point.id, "splitting line is closer to target axis than furthest neighbour", self.nns[0]['dist'], ">", p_dist)
+                    # print(C.point.id, "splitting line is closer to target axis than furthest neighbour", self.nns[0]['dist'], ">", p_dist)
                     if C.left is not None:
                         self.search_knn(C, C.left, T, k, axis + 1)
                     if C.right is not None:
@@ -169,35 +168,116 @@ class KDTreeNN(NearestNeigh):
 
         if new_n['hash'] not in [n['hash'] for n in self.nns]:
             if replace:
-                print("Replaced", self.nns[0]['id'], self.nns[0]['dist'], "with",
-                      point.id, dist)
+                # print("Replaced", self.nns[0]['id'], self.nns[0]['dist'], "with",
+                #       point.id, dist)
                 self.nns[0] = new_n
                 self.nns = sorted(self.nns, key=lambda k: k['dist'],
                                   reverse=True)
             else:
-                print("saved new neighbour", point.id, dist)
+                # print("saved new neighbour", point.id, dist)
                 self.nns.append(new_n)
                 self.nns = sorted(self.nns, key=lambda k: k['dist'],
                                   reverse=True)
 
     def add_point(self, point: Point) -> bool:
         """
-        Recursive traverse tree to appropriate location and adds point.
+        Recursive traverse to appropriate location and add point.
         """
 
         return self.add_traverse(point, self.root, 0)
+
+    def add_traverse(self, point, cur_node, axis: int, parent=None):
+        """
+        Helper method for add_point()
+
+        """
+
+        # Check each node for duplication as we move down the tree.
+        if self.hash_point(cur_node.point) == self.hash_point(point):
+            return False
+
+        if axis % 2 == 0:
+            c_node_val = cur_node.point.lat
+            point_val = point.lat
+        else:
+            c_node_val = cur_node.point.lon
+            point_val = point.lon
+
+        # Evaluate right branch
+        if point_val >= c_node_val:
+
+            # Traverse right subtree if it exists
+            if cur_node.right:
+                # print("Traversing right of ", cur_node.point)
+                return self.add_traverse(
+                    point, cur_node.right, axis + 1, cur_node)
+
+            # If no subtree, target location has been reached.
+            else:
+                # print("Adding new node under parent", cur_node.point)
+                cur_node.right = Node(
+                    point, left=None, right=None, parent=cur_node)
+                return True
+
+        # Evaluate left branch
+        else:
+            if cur_node.left:
+                # print("Traversing left of ", cur_node.point)
+                return self.add_traverse(
+                    point, cur_node.left, axis + 1, cur_node)
+
+            # If no subtree, target location has been reached.
+            else:
+                # print("Adding new node under parent", cur_node.point)
+                cur_node.left = Node(
+                    point, left=None, right=None, parent=cur_node)
+                return True
+
+    def delete_point(self, point: Point) -> bool:
+        # To be implemented.
+        pass
 
     def delete_point(self, point: Point) -> bool:
         # To be implemented.
         pass
 
     def is_point_in(self, point: Point) -> bool:
-        # To be implemented.
-        pass
+        """
+        Return true if point exists in tree otherwise false.
+        """
+        return self.is_point_in_recursive(point, 0)
+
+    def is_point_in_recursive(self, cur_node, Node, point: Point, axis):
+
+        if cur_node.point.id == point.id:
+            return True
+
+        if axis % 2 == 0:
+            c_node_val = cur_node.point.lat
+            point_val = point.lat
+        else:
+            c_node_val = cur_node.point.lon
+            point_val = point.lon
+
+        # Check right branch
+        if point_val >= c_node_val:
+            if cur_node.right:
+                return self.is_point_in_recursive(
+                    point, cur_node.right, axis + 1, cur_node)
+            else:
+                return False
+
+        # Check left branch
+        else:
+            if cur_node.left:
+                return self.is_point_in_recursive(
+                    point, cur_node.left, axis + 1, cur_node)
+            else:
+                return False
 
     def p_distance(self, axis, C: Point, T: Point) -> float:
         """
-        Returns perpendicular distance between T splitting axis and C
+        Returns perpendicular-to-axis distance between T splitting axis and C
         """
 
         # Dummy point method
