@@ -10,7 +10,6 @@ class KDTreeNN(NearestNeigh):
         self.root = None
 
         # Holds results of NN search queries
-        self.neighbours = []
 
         # Used for detailed print/debug output
         self.print_count = 0
@@ -45,7 +44,7 @@ class KDTreeNN(NearestNeigh):
         if len(points) < 1:
             return None
 
-        # Subset size 1, root node with no children OR leaf node.
+        
         elif len(points) == 1:
             split = "lat" if axis % 2 == 0 else "lon"
             return Node(
@@ -242,23 +241,7 @@ class KDTreeNN(NearestNeigh):
                     self.b_list.append(self.hash_point(cur_node.point))
                     self.backtrack(cur_node, targ, axis, k, subtree)
 
-    def p_distance_to(self, axis: int, C: Point, P: Point) -> float:
-        """
-        Returns perpendicular distance between C axis and P
-        """
 
-        # Dummy point method
-        # P = target
-        # D = dummy node perpendicular to target
-        # C = splitting line / current node
-
-        if axis % 2 == 0:
-            D = Point("", C.cat, C.lat, P.lon)
-
-        else:
-            D = Point("", C.cat, P.lat, C.lon)
-
-        return P.dist_to(D)
 
     def axis_is_valid(self, axis: int, node: Node) -> bool:
         """

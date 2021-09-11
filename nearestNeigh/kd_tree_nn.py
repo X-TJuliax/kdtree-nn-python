@@ -16,7 +16,7 @@ class KDTreeNN(NearestNeigh):
 
     def kdtree(self, points: [Point], axis, parent=None) -> Node:
 
-        # Do nothing
+        # No points remain, Do nothing
         if len(points) < 1:
             return None
 
@@ -58,7 +58,7 @@ class KDTreeNN(NearestNeigh):
 
     def search(self, search_term: Point, k: int) -> [Point]:
 
-        self.nns, self.moves = [], set()
+        self.nns, self.closed_list = [], []
         self.search_knn(None, self.root, search_term, k, 0, None)
         self.nns = sorted(self.nns, key=lambda k: k['dist'])
         self.nns = [n['point'] for n in self.nns]
@@ -66,7 +66,7 @@ class KDTreeNN(NearestNeigh):
         return self.nns
 
     def search_knn(self, prev, C: Node, T: Point, k, axis,
-                   move_hash, backtracking=False):
+                   backtracking=False):
         """
         P = previous node to C
         C = current node under evaluation
@@ -83,14 +83,13 @@ class KDTreeNN(NearestNeigh):
             dtn = "Traversed to" if not backtracking else "Backtracked to"
             # print(dtn, C.point.id, "from", prev_print_val)
 
-            # Stop backtracking at root
-            root = True if C.parent is None else False
-            if root and backtracking:
-                # print("backtracked back to root")
+            # Stop backtracking at when root reached
+            if C.parent is None and backtracking:
                 return
 
-            # Prevent multiple traversals in any direction
-            if move_hash in self.moves:
+            # Prevent uneccesary evaluations/multiple traversals
+            c_hash = self.hash_point(C.point)
+            if c_hash in self.closed_list:
                 # print(prev.point.id, "to", C.point.id, "already traversed")
                 return
 
@@ -104,27 +103,21 @@ class KDTreeNN(NearestNeigh):
             if not backtracking:
                 if T_dim_val >= C_dim_val:
                     if C.right is not None:
-                        new_mh = self.hash_move(C.point, C.right.point, "fwd")
-                        self.moves.add(move_hash)
-                        self.search_knn(C, C.right, T, k, axis + 1, new_mh)
+                        self.search_knn(C, C.right, T, k, axis + 1)
                     else:
                         backtracking = True
                 else:
                     if C.left is not None:
-                        new_mh = self.hash_move(C.point, C.left.point, "fwd")
-                        self.moves.add(move_hash)
-                        self.search_knn(C, C.left, T, k, axis + 1, new_mh)
+                        self.search_knn(C, C.left, T, k, axis + 1)
                     else:
                         backtracking = True
 
                 if not C.left and not C.right:
                     backtracking = True
-                    print(C.point.id, "leaf node reached")
+                    # print(C.point.id, "leaf node reached")
 
             # Reverse - evaluate C
             if backtracking:
-
-                # print("backtracking - evaluating", C.point.id)
 
                 p_dist = self.p_distance(axis, C.point, T)
                 if C.point.cat == T.cat:
@@ -137,33 +130,17 @@ class KDTreeNN(NearestNeigh):
 
                 # Fwd-traverse unexplored subtree if required
                 if self.nns[0]['dist'] > p_dist or len(self.nns) < k or check_other_subtree:
-                # if self.nns[0]['dist'] >= p_dist or check_other_subtree:
-                    print("checking", C.point.id, "other subtree")
+                    # print("checking", C.point.id, "other subtree")
                     if C.left is not None:
-                        new_mh = self.hash_move(C.point, C.left.point, "fwd")
-                        self.moves.add(move_hash)
-                        self.search_knn(C, C.left, T, k, axis + 1, new_mh)
+                        self.search_knn(C, C.left, T, k, axis + 1)
                     if C.right is not None:
-                        new_mh = self.hash_move(C.point, C.right.point, "fwd")
-                        self.moves.add(move_hash)
-                        self.search_knn(C, C.right, T, k, axis + 1, new_mh)
+                        self.search_knn(C, C.right, T, k, axis + 1)
 
                 # Continue backwards up the tree
+                self.closed_list.append(c_hash)
                 if C.parent is not None:
-                    new_mh = self.hash_move(C.point, C.parent.point, "rev")
-                    self.moves.add(move_hash)
-                    self.search_knn(C, C.parent, T, k, axis - 1, new_mh,
+                    self.search_knn(C, C.parent, T, k, axis - 1,
                                     backtracking=True)
-
-    def hash_move(self, a, b, direction):
-        """
-        Hash point a and b as a record of a movement between nodes
-        """
-
-        d_val = 13 if direction == "fwd" else 27
-        hash_a = self.hash_point(a)
-        hash_b = self.hash_point(b)
-        return abs(hash_a + hash_b) * d_val
 
     def save_n(self, dist, point: Point, replace=False):
         """
