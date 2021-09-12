@@ -234,20 +234,111 @@ class KDTreeNN(NearestNeigh):
                 return True
 
     def delete_point(self, point: Point) -> bool:
-        # To be implemented.
-        pass
+        """
+        Return true if point was deleted otherwise false.
+        """
+        return self.delete_recursive(self.root, point, 0, None)
 
-    def delete_point(self, point: Point) -> bool:
-        # To be implemented.
-        pass
+    def delete_recursive(self, C: Node, point: Point, axis, subtree):
+
+        if axis % 2 == 0:
+            c_node_val = C.point.lat
+            point_val = point.lat
+        else:
+            c_node_val = C.point.lon
+            point_val = point.lon
+
+        # Check if current node is the deletion target
+        if C.point.id == point.id:
+
+            # Case 1: deletion target is a leaf node
+            # Delete the node
+            if not C.left and not C.right:
+                if subtree == "L":
+                    C.parent.left = None
+                elif subtree == "R":
+                    C.parent.right = None
+                else:
+                    return False
+                return True
+
+            # Case 2: Right subtree exists
+            # Replace deleted node with right subtree lowest axis value node
+            elif C.right is not None:
+                smallest_child = self.lowest_val_child(
+                    C.right, axis, axis, C.right)
+                if subtree == "L":
+                    C.parent.left = smallest_child
+                elif subtree == "R":
+                    C.parent.right = smallest_child
+                else:
+                    return False
+                return True
+
+            # Case 3: No right subtree, left subtree exists
+            # Delete, swap left subtree to right
+            elif not C.right and C.left is not None:
+                if subtree == "L":
+                    C.parent.left = C.left
+                elif subtree == "R":
+                    C.parent.right = C.right
+                else:
+                    return False
+                return True
+
+            else:
+                return False
+
+        # Continue traversing
+        else:
+            # Check right branch
+            if point_val >= c_node_val:
+                if C.right:
+                    return self.delete_recursive(C.right, point, axis, subtree)
+                else:
+                    return False
+
+            # Check left branch
+            else:
+                if C.left:
+                    return self.delete_recursive(C.left, point, axis, subtree)
+                else:
+                    return False
+
+    def lowest_val_child(self, C, c_axis, t_axis, lowest):
+        """
+        Helper method for Case 2 of delete_recursive.
+        Returns lowest value node of the subtree of C matching given t_axis
+        """
+
+        new_low = lowest
+
+        # Check current node lat
+        if t_axis % 2 == 0:
+            if C.point.lat < lowest.point.lat:
+                new_low = C.point
+
+        # Check current node lon
+        else:
+            if C.point.lon < lowest.point.lon:
+                new_low = C.point
+
+        # Check if lower value nodes exist in subtrees
+        if C.left:
+            new_low = self.lowest_val_child(C, c_axis + 1, t_axis, new_low)
+
+        if C.right:
+            new_low = self.lowest_val_child(C, c_axis + 1, t_axis, new_low)
+
+        return new_low
 
     def is_point_in(self, point: Point) -> bool:
         """
         Return true if point exists in tree otherwise false.
         """
-        return self.is_point_in_recursive(point, 0)
+        return self.is_point_in_recursive(self.root, point, 0)
 
-    def is_point_in_recursive(self, cur_node, Node, point: Point, axis):
+    def is_point_in_recursive(self, cur_node: Node, point: Point, axis):
 
         if cur_node.point.id == point.id:
             return True
@@ -263,7 +354,7 @@ class KDTreeNN(NearestNeigh):
         if point_val >= c_node_val:
             if cur_node.right:
                 return self.is_point_in_recursive(
-                    point, cur_node.right, axis + 1, cur_node)
+                    cur_node.right, point, axis + 1)
             else:
                 return False
 
@@ -271,7 +362,7 @@ class KDTreeNN(NearestNeigh):
         else:
             if cur_node.left:
                 return self.is_point_in_recursive(
-                    point, cur_node.left, axis + 1, cur_node)
+                    cur_node.left, point, axis + 1)
             else:
                 return False
 

@@ -1,10 +1,28 @@
 Point{id=id657, cat=RESTAURANT, lat=-36.2707913902, lon=144.971396306}
 Point{id=id704, cat=RESTAURANT, lat=-36.3347836327, lon=145.008526079}
-Point{id=id1167, cat=RESTAURANT, lat=-36.4355438275, lon=145.032232726}
 Point{id=id831, cat=RESTAURANT, lat=-36.3432397838, lon=145.770916586}
 Point{id=id368, cat=RESTAURANT, lat=-36.4441749498, lon=145.011776895}
 Point{id=id990, cat=RESTAURANT, lat=-36.4848177759, lon=144.9681889}
-Point{id=id1137, cat=RESTAURANT, lat=-36.5078246006, lon=145.204107411}
 Point{id=id8, cat=RESTAURANT, lat=-36.5235015242, lon=145.001796399}
-Point{id=id1000, cat=RESTAURANT, lat=-36.5421357563, lon=144.931418298}
 Point{id=id288, cat=RESTAURANT, lat=-36.538970092, lon=145.063629989}
+Point{id=id287, cat=RESTAURANT, lat=-36.2698910011, lon=146.436530155}
+Point{id=id238, cat=RESTAURANT, lat=-36.5990284328, lon=144.979362088}
+Point{id=id120, cat=RESTAURANT, lat=-36.5384519923, lon=145.765199677}
+Delete point failed.
+Point{id=id657, cat=RESTAURANT, lat=-36.2707913902, lon=144.971396306}
+Point{id=id704, cat=RESTAURANT, lat=-36.3347836327, lon=145.008526079}
+Point{id=id831, cat=RESTAURANT, lat=-36.3432397838, lon=145.770916586}
+Point{id=id368, cat=RESTAURANT, lat=-36.4441749498, lon=145.011776895}
+Point{id=id990, cat=RESTAURANT, lat=-36.4848177759, lon=144.9681889}
+Point{id=id8, cat=RESTAURANT, lat=-36.5235015242, lon=145.001796399}
+Point{id=id288, cat=RESTAURANT, lat=-36.538970092, lon=145.063629989}
+Point{id=id287, cat=RESTAURANT, lat=-36.2698910011, lon=146.436530155}
+Point{id=id238, cat=RESTAURANT, lat=-36.5990284328, lon=144.979362088}
+Point{id=id120, cat=RESTAURANT, lat=-36.5384519923, lon=145.765199677}
+Delete point failed.
+False
+True
+Add point failed.
+Delete point failed.
+True
+False
